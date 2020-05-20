@@ -81,7 +81,7 @@ variables {p q}
 
 lemma complemented_of_closed_compl (h : is_compl p q) (hp : is_closed (p : set E))
   (hq : is_closed (q : set E)) : p.complemented :=
-⟨p.linear_proj_of_closed_compl q h hp hq, p.linear_proj_of_is_compl_apply_left q h⟩
+⟨p.linear_proj_of_closed_compl q h hp hq, submodule.linear_proj_of_is_compl_apply_left h⟩
 
 lemma complemented_of_quotient_finite_dimensional [complete_space 𝕜]
   [finite_dimensional 𝕜 p.quotient] (hp : is_closed (p : set E)) :
@@ -93,3 +93,21 @@ begin
 end
 
 end subspace
+
+namespace continuous_linear_map
+
+/-- If `f : E → F` is a surjective continuous linear map between two Banach spaces
+and `g : E → ker f` is a continuous linear projection onto `ker f`, then `x ↦ (g x, f x)`
+defines a continuous linear equivalence between `E` and `F × ker f`. -/
+def equiv_prod_of_proj_ker_of_surjective [complete_space E] [complete_space F]
+  {f : E →L[𝕜] F} (g : E →L[𝕜] f.ker) (hg : ∀ x : f.ker, g x = x) (hf : f.range = ⊤) :
+  E ≃L[𝕜] (F × f.ker) :=
+linear_equiv.to_continuous_linear_equiv_of_continuous
+  ((g : E →ₗ[𝕜] f.ker).equiv_prod_of_proj_ker_of_surjective hg hf)
+  (f.continuous.prod_mk g.continuous)
+
+@[simp] lemma equiv_prod_of_proj_ker_of_surjective_symm_apply [complete_space E] [complete_space F]
+  {f : E →L[𝕜] F} (g : E →L[𝕜] f.ker) (hg : ∀ x : f.ker, g x = x) (hf : f.range = ⊤) (x : E) :
+  equiv_prod_of_proj_ker_of_surjective g hg hf x = (f x, g x) := rfl
+
+end continuous_linear_map

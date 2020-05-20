@@ -1,7 +1,15 @@
+/-
+Copyright (c) 2020 Yury Kudryashov. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Yury Kudryashov.
+-/
 import analysis.calculus.inverse
-/-! ### Implicit function theorem
+import analysis.normed_space.complemented
 
-Now we prove a version of the implicit function theorem. Suppose that `f : E → F` has derivative
+/-!
+# Implicit function theorem
+
+We prove a version of the implicit function theorem. Suppose that `f : E → F` has derivative
 `f' : E →L[𝕜] F` at `a` in the strict sense, and `f'inv : F →L[𝕜] E` is a right inverse of `f'`.
 Then there is a local homeomorphism `local_homeomorph E (F × f'.ker)` sending `{x | f x = b}` to
 `{(z, y) | z = b}`.
@@ -18,43 +26,65 @@ In the next section we shall prove another version of this theorem dealing with 
 F → G` such that `∂f/∂y` is invertible.
 -/
 
-open continuous_linear_map (fst snd subtype_val smul_right)
+noncomputable theory
+
+open_locale topological_space
+open continuous_linear_map (fst snd subtype_val smul_right ker_prod)
+open continuous_linear_equiv (of_bijective)
 
 namespace has_strict_fderiv_at
 
-variables [cs : complete_space E] {f : E → F} {f' : E →L[𝕜] F} {f'inv : F →L[𝕜] E} {a : E}
+section generic
 
-/-- The map `φ : E → F × f'.ker` given by $$φ(x)=(f(x), x - a - {f'}⁻¹ (f' (x - a)))$$ has
-derivative $$φ'(x)=\left(f'(x), x - {f'}⁻¹ (f' x)\right)$$ at `a`. We formulate this fact using much
-longer formulas to reuse proofs of `x - {f'}⁻¹ (f' x) ∈ f'.ker` and of the fact that the derivative
-is invertible. -/
-lemma implicit_aux_has_fderiv (hf : has_strict_fderiv_at f f' a)
-  (hf' : function.right_inverse f'inv f') :
-  has_strict_fderiv_at
-    (λ x, (f x, continuous_linear_map.proj_ker_of_right_inverse f' f'inv hf' (x - a)))
-    (continuous_linear_equiv.equiv_of_right_inverse f' f'inv hf' : E →L[𝕜] (F × f'.ker)) a :=
-hf.prod $ (continuous_linear_map.has_strict_fderiv_at _).comp a
-  ((has_strict_fderiv_at_id a).sub_const a)
+variables {𝕜 : Type*} [nondiscrete_normed_field 𝕜]
+  {E : Type*} [normed_group E] [normed_space 𝕜 E] [complete_space E]
+  {F : Type*} [normed_group F] [normed_space 𝕜 F] [complete_space F]
+  {f : E → F} {f' : E →L[𝕜] F} {proj : E →L[𝕜] f'.ker} {a : E}
 
-include cs
+/-- An auxiliary lemma used to prove the Implicit function theorem for a map with a surjective
+derivative `f' : E → F` with fixed projection `proj : E → ker f'`. This lemma states that
+`x ↦ (f x, proj (x - a))` has derivative `x ↦ (f' x, proj x)`, and the latter map is a continuous
+linear equivalence. -/
+lemma implicit_of_proj_aux_has_fderiv (hf : has_strict_fderiv_at f f' a)
+  (hf' : f'.range = ⊤) (hproj : ∀ x : f'.ker, proj x = x) :
+  has_strict_fderiv_at (λ x, (f x, proj (x - a)))
+    (proj.equiv_prod_of_proj_ker_of_surjective hproj hf' : E →L[𝕜] F × f'.ker) a :=
+hf.prod $ proj.has_strict_fderiv_at.comp a ((has_strict_fderiv_at_id a).sub_const a)
 
 section defs
 
-variables (f f' f'inv)
+variables (f f' proj)
 
 /-- A local homeomorphism between E` and `F × f'.ker` sending level surfaces of `f`
 to horizontal subspaces. -/
-def implicit_to_local_homeomorph (hf : has_strict_fderiv_at f f' a)
-  (hf' : function.right_inverse f'inv f') : local_homeomorph E (F × f'.ker) :=
-(hf.implicit_aux_has_fderiv hf').to_local_homeomorph _
+def implicit_to_local_homeomorph_of_projection (hf : has_strict_fderiv_at f f' a)
+  (hf' : f'.range = ⊤) (hproj : ∀ x : f'.ker, proj x = x) :
+  local_homeomorph E (F × f'.ker) :=
+(hf.implicit_of_proj_aux_has_fderiv hf' hproj).to_local_homeomorph _
+
+/-- A local homeomorphism between E` and `F × f'.ker` sending level surfaces of `f`
+to horizontal subspaces. -/
+def implicit_to_local_homeomorph_of_complemented (hf : has_strict_fderiv_at f f' a)
+  (hf' : f'.range = ⊤) (hker : f'.ker.complemented) :
+  local_homeomorph E (F × f'.ker) :=
+implicit_to_local_homeomorph_of_projection f f' (classical.some hker) hf hf'
+  (classical.some_spec hker)
 
 /-- Implicit function `g` defined by `f (g z y) = z`. -/
-def implicit_function (hf : has_strict_fderiv_at f f' a)
-  (hf' : function.right_inverse f'inv f') : F → f'.ker → E :=
-function.curry $ (hf.implicit_aux_has_fderiv hf').local_inverse _ _ _
+def implicit_function_of_proj (hf : has_strict_fderiv_at f f' a)
+  (hf' : f'.range = ⊤) (hproj : ∀ x : f'.ker, proj x = x) :
+  F → f'.ker → E :=
+function.curry $ (hf.implicit_to_local_homeomorph_of_projection f f' proj hf' hproj).symm
+
+/-- Implicit function `g` defined by `f (g z y) = z`. -/
+def implicit_function_of_complemented (hf : has_strict_fderiv_at f f' a)
+  (hf' : f'.range = ⊤) (hker : f'.ker.complemented) :
+  F → f'.ker → E :=
+function.curry $ (hf.implicit_to_local_homeomorph_of_complemented f f' hf' hker).symm
 
 end defs
 
+/-
 @[simp] lemma implicit_to_local_homeomorph_fst (hf : has_strict_fderiv_at f f' a)
   (hf' : function.right_inverse f'inv f') (x : E) :
   ((hf.implicit_to_local_homeomorph f f' f'inv  hf').to_fun x).fst = f x :=
@@ -118,8 +148,25 @@ begin
   ext x,
   simp
 end
+-/
 
-end has_strict_fderiv_at
+end generic
+
+section finite_dimensional
+
+variables {𝕜 : Type*} [nondiscrete_normed_field 𝕜] [complete_space 𝕜]
+  {E : Type*} [normed_group E] [normed_space 𝕜 E] [complete_space E]
+  {F : Type*} [normed_group F] [normed_space 𝕜 F] [finite_dimensional 𝕜 F]
+  (f : E → F) (f' : E →L[𝕜] F) {a : E}
+
+def implicit_to_local_homeomorph (hf : has_strict_fderiv_at f f' a) (hf' : f'.range = ⊤) :
+  local_homeomorph E (F × f'.ker) :=
+by haveI := finite_dimensional.complete 𝕜 F; exact
+hf.implicit_to_local_homeomorph_of_complemented f f' hf'
+  f'.ker_complemented_of_finite_dimensional_range
+
+end finite_dimensional
+
 
 /-!
 ### Implicit function theorem for `f : E × F → G`
@@ -128,7 +175,12 @@ Now we prove the implicit function theorem for a function `f : E × F → G` tha
 `f' : E × F →L[𝕜] G` in the strict sense and the derivative `∂f/∂y : F →L[𝕜] G` is invertible.
 -/
 
-namespace has_strict_fderiv_at
+section product
+
+variables {𝕜 : Type*} [nondiscrete_normed_field 𝕜]
+  {E : Type*} [normed_group E] [normed_space 𝕜 E]
+  {F : Type*} [normed_group F] [normed_space 𝕜 F]
+  {G : Type*} [normed_group G] [normed_space 𝕜 G]
 
 variables [cs : complete_space (E × F)] {f : E × F → G} (f' : E × F →L[𝕜] G) (f'inv : G →L[𝕜] F)
   {p : E × F} (hf : has_strict_fderiv_at f f' p)
@@ -198,5 +250,7 @@ lemma eventually_prod_implicit_function_eq :
   ∀ᶠ x in 𝓝 p, hf.prod_implicit_function f hf'l hf'r ((x : E × F).1, f x) = x.2 :=
 (hf.prod_implicit_function_aux_deriv hf'l hf'r).eventually_left_inverse.mono $
   λ x hx, congr_arg prod.snd hx
+
+end product
 
 end has_strict_fderiv_at
